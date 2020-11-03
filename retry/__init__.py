@@ -27,16 +27,23 @@ class n_retries:  # pylint: disable=invalid-name,old-style-class,too-few-public-
 class http_retries:  # pylint: disable=invalid-name,old-style-class,too-few-public-methods
     """ Retry up to n times, with special logic for HTTP requests.
     """
-    def __init__(self, n, retry_on_http_status=(429, 500, 502, 503, 504), delay=0.0):
+    def __init__(self, n, retry_on_http_status=(429, 500, 502, 503, 504), delay=0.0, stats=None):
         """ Retry up to n times, with special logic for HTTP requests.
 
+            For per call statistics, pass a dict as `stats` and check its
+            `"retries"` value afterwards. For global stats (i.e. _all_ calls
+            to the original function) see `retry.me(..., stats)` param.
+
             @param n (int) maximum number of retries.
-            @param retry_on_http_status (list of int) retry on these HTTP status codes only.
+            @param retry_on_http_status (list of int) retry on these HTTP
+                status codes only.
             @param delay (float) delay in seconds before retry.
+            @param stats (dict) count number of retries in stats["retries"].
         """
         self.n = n + 1
         self.retry_on_http_status = retry_on_http_status
         self.delay = delay
+        self.stats = stats if stats is not None else {}
 
     def __call__(self, _exception, result):
         self.n -= 1
@@ -49,11 +56,12 @@ class http_retries:  # pylint: disable=invalid-name,old-style-class,too-few-publ
         ):
             _LOG.debug("retrying in %s seconds...", self.delay)
             time.sleep(self.delay)
+            self.stats["retries"] = self.stats.get("retries", 0) + 1
             return True
         return False
 
 
-def me(function, trigger_method=None, trigger_function=None):  # pylint: disable=invalid-name
+def me(function, trigger_method=None, trigger_function=None, stats=None):  # pylint: disable=invalid-name
     """ Decorator retry.me(function)
 
         This decorates the original function and allows it to accept a new
@@ -74,11 +82,16 @@ def me(function, trigger_method=None, trigger_function=None):  # pylint: disable
         function. Should `retries()` evaluate to True, another attempt is made
         and the cycle repeats itself.
 
+        For global stats (i.e. all calls to the original function), pass a
+        dict as `stats` and check its `"retries"` value afterwards.
+        For per call statistics, see `http_retries(..., stats)` param.
+
         @param function (callable) the function/method to be retried on error.
         @param trigger_method (str) if given, this method is called on the
             result object of the original function.
         @param trigger_function (callable) if given, this function is called
             with the result of the original function.
+        @param stats (dict) count number of retries in stats["retries"].
     """
     def _inner(*args, **kwargs):
         retries = kwargs.pop("retries", None) or 0
@@ -103,4 +116,5 @@ def me(function, trigger_method=None, trigger_function=None):  # pylint: disable
                 if not retries(exception, result):
                     raise
                 _LOG.debug("error %r, retrying...", exception)
+                stats["retries"] = stats.get("retries", 0) + 1
     return _inner
