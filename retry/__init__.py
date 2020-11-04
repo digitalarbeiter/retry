@@ -61,7 +61,7 @@ class http_retries:  # pylint: disable=invalid-name,old-style-class,too-few-publ
         return False
 
 
-def me(function, trigger_method=None, trigger_function=None, stats=None):  # pylint: disable=invalid-name
+def me(function, default_retries=None, trigger_method=None, trigger_function=None, stats=None):  # pylint: disable=invalid-name
     """ Decorator retry.me(function)
 
         This decorates the original function and allows it to accept a new
@@ -87,6 +87,7 @@ def me(function, trigger_method=None, trigger_function=None, stats=None):  # pyl
         For per call statistics, see `http_retries(..., stats)` param.
 
         @param function (callable) the function/method to be retried on error.
+        @param default_retries (int) by default retry this many times.
         @param trigger_method (str) if given, this method is called on the
             result object of the original function.
         @param trigger_function (callable) if given, this function is called
@@ -96,7 +97,7 @@ def me(function, trigger_method=None, trigger_function=None, stats=None):  # pyl
     if stats is None:  # `if stats:` would overwrite a passed in empty dict
         stats = {}
     def _inner(*args, **kwargs):
-        retries = kwargs.pop("retries", None) or 0
+        retries = kwargs.pop("retries", default_retries) or 0
         if not retries:
             # no retries, so just forge ahead with the original function
             return function(*args, **kwargs)
