@@ -93,6 +93,8 @@ def me(function, trigger_method=None, trigger_function=None, stats=None):  # pyl
             with the result of the original function.
         @param stats (dict) count number of retries in stats["retries"].
     """
+    if stats is None:  # `if stats:` would overwrite a passed in empty dict
+        stats = {}
     def _inner(*args, **kwargs):
         retries = kwargs.pop("retries", None) or 0
         if not retries:
